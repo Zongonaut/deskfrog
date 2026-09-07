@@ -12,3 +12,6 @@ windows = { version = "0.62.2", features = ["Win32_Graphics_Gdi", "Win32_UI_Wind
 
 [dev-dependencies]
 image = "0.25.10"
+
+[build-dependencies]
+winres = "0.1.12"

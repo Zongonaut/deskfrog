@@ -5,10 +5,8 @@ use deskfrog::render::bubble::{self, BubbleStyle};
 use deskfrog::render::font::GLYPH_HEIGHT;
 use deskfrog::render::glyph::GlyphBitmap;
 use deskfrog::render;
+use deskfrog::config;
 
-const FROG_SIZE_PX: f32 = 24.0;
-const STEP_PX: i32 = FROG_SIZE_PX as i32;
-const STEP_INTERVAL_MS: u32 = 500;
 const MAX_BUBBLE_LINES: u32 = 3;
 
 fn window_origin(pos: Point, glyph_center: (i32, i32)) -> (i32, i32) {
@@ -25,8 +23,12 @@ fn prefer_below(pos: Point, monitors: &[deskfrog::brain::movement::MonitorBounds
 }
 
 fn main() {
+    let config = config::load();
+    let frog_size_px = config.appearance.frog_size_px;
+    let step_px = frog_size_px as i32;
+
     let font_data = std::fs::read(r"C:\Windows\Fonts\seguiemj.ttf").expect("failed to read emoji font");
-    let glyph: GlyphBitmap = render::glyph::rasterize_color_emoji(&font_data, '\u{1F438}', FROG_SIZE_PX)
+    let glyph: GlyphBitmap = render::glyph::rasterize_color_emoji(&font_data, '\u{1F438}', frog_size_px)
         .expect("failed to rasterize frog emoji");
 
     let monitors = enumerate_monitors();
@@ -37,8 +39,10 @@ fn main() {
     };
 
     let mut rng = rand::rng();
-    let mut frog = Frog::new(start, STEP_PX, &mut rng);
-    let style = BubbleStyle::default();
+    let mut frog = Frog::new(start, step_px, config.behavior.flee_radius_px, config.messages, &mut rng);
+
+    let mut style = BubbleStyle::default();
+    style.scale = config.appearance.bubble_scale.max(1);
 
     // Canvas must comfortably fit the widest/tallest possible bubble plus the
     // frog and its margins/gap, on either the "above" or "below" side of it —
@@ -50,8 +54,9 @@ fn main() {
         + glyph.height
         + bubble_gap_and_margins;
 
-    let window = FrogWindow::new(canvas_w, canvas_h).expect("failed to create window");
+    let mut window = FrogWindow::new(canvas_w, canvas_h).expect("failed to create window");
     window.show();
+    window.enable_tray_icon("DeskFrog");
 
     let render_frog = |frog: &Frog, monitors: &[deskfrog::brain::movement::MonitorBounds]| {
         let layout = bubble::compose(
@@ -69,7 +74,7 @@ fn main() {
     let (frame, x0, y0) = render_frog(&frog, &monitors);
     window.present(&frame, x0, y0);
 
-    window.start_timer(STEP_INTERVAL_MS);
+    window.start_timer(config.behavior.step_interval_ms);
     window.run_message_loop_with(|| {
         frog.step(
             &WorldInput {

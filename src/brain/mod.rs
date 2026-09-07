@@ -5,12 +5,11 @@ use messages::Commentary;
 use movement::{within, Direction, MonitorBounds, Point, Wanderer};
 use rand::{Rng, RngExt};
 
-const FLEE_RADIUS_PX: i32 = 120;
-/// A sleeping frog wakes (and immediately flees) if the cursor gets this close —
-/// wider than FLEE_RADIUS_PX so waking up doesn't feel like a jump-scare dodge.
-const WAKE_RADIUS_PX: i32 = 200;
-/// Stop fleeing once this far from the cursor.
-const SAFE_DISTANCE_PX: i32 = 220;
+/// How much farther than the flee radius a sleeping frog's wake radius and the
+/// fleeing frog's stop-fleeing distance are — preserves the tuned feel of these
+/// margins regardless of the configured flee radius.
+const WAKE_RADIUS_MARGIN_PX: i32 = 80;
+const SAFE_DISTANCE_MARGIN_PX: i32 = 100;
 /// Chance that a fresh flee turns into a panic (double speed + a startled shout).
 const PANIC_CHANCE: f32 = 0.2;
 
@@ -41,29 +40,35 @@ pub struct Frog {
     state: State,
     sleep_frame: u32,
     panic_ticks_left: u32,
+    flee_radius_px: i32,
+    wake_radius_px: i32,
+    safe_distance_px: i32,
 }
 
 impl Frog {
-    pub fn new(start: Point, step_px: i32, rng: &mut impl Rng) -> Self {
+    pub fn new(start: Point, step_px: i32, flee_radius_px: i32, messages: Vec<String>, rng: &mut impl Rng) -> Self {
         Self {
             pos: start,
             wanderer: Wanderer::new(step_px, Direction::E),
-            commentary: Commentary::new(rng),
+            commentary: Commentary::new(messages, rng),
             state: State::Wander,
             sleep_frame: 0,
             panic_ticks_left: 0,
+            flee_radius_px,
+            wake_radius_px: flee_radius_px + WAKE_RADIUS_MARGIN_PX,
+            safe_distance_px: flee_radius_px + SAFE_DISTANCE_MARGIN_PX,
         }
     }
 
     pub fn step(&mut self, input: &WorldInput, rng: &mut impl Rng) {
-        let threat_close = within(self.pos, input.cursor, FLEE_RADIUS_PX);
+        let threat_close = within(self.pos, input.cursor, self.flee_radius_px);
         let sleeping = matches!(self.state, State::Sleeping(_));
         // Panic only interrupts plain wandering — never a sleep, startle, idle
         // pause, or an in-progress commentary bubble, where an "Eeek!" popping
         // in on top would just look like a rendering glitch.
         let plain_wander =
             matches!(self.state, State::Wander) && self.commentary.bubble().is_none();
-        if threat_close || (sleeping && within(self.pos, input.cursor, WAKE_RADIUS_PX)) {
+        if threat_close || (sleeping && within(self.pos, input.cursor, self.wake_radius_px)) {
             if plain_wander && rng.random::<f32>() < PANIC_CHANCE {
                 self.panic_ticks_left = rng.random_range(2..4);
             }
@@ -78,7 +83,7 @@ impl Frog {
                     movement::flee_step(self.pos, input.cursor, self.wanderer.step_px(), input.monitors)
                 };
                 self.panic_ticks_left = self.panic_ticks_left.saturating_sub(1);
-                if !within(self.pos, input.cursor, SAFE_DISTANCE_PX) {
+                if !within(self.pos, input.cursor, self.safe_distance_px) {
                     self.state = State::Wander;
                     self.panic_ticks_left = 0;
                 }

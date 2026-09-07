@@ -14,14 +14,16 @@ pub const MESSAGES: &[&str] = &[
 /// in DeskFrog's case) — this stays decoupled from wall-clock time so the brain
 /// has no OS dependency.
 pub struct Commentary {
+    messages: Vec<String>,
     ticks_until_next: u32,
     speaking_ticks_left: u32,
     current: Option<String>,
 }
 
 impl Commentary {
-    pub fn new(rng: &mut impl Rng) -> Self {
+    pub fn new(messages: Vec<String>, rng: &mut impl Rng) -> Self {
         Self {
+            messages,
             ticks_until_next: rng.random_range(4..10),
             speaking_ticks_left: 0,
             current: None,
@@ -43,8 +45,13 @@ impl Commentary {
             return;
         }
 
-        let msg = MESSAGES[rng.random_range(0..MESSAGES.len())];
-        self.current = Some(msg.to_string());
+        if self.messages.is_empty() {
+            self.ticks_until_next = rng.random_range(20..80);
+            return;
+        }
+
+        let msg = &self.messages[rng.random_range(0..self.messages.len())];
+        self.current = Some(msg.clone());
         self.speaking_ticks_left = 6;
     }
 

@@ -8,13 +8,48 @@ use windows::Win32::Graphics::Gdi::{
     BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR,
     MONITORINFO,
 };
-use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetCursorPos, GetMessageW, LoadCursorW,
-    PostQuitMessage, RegisterClassExW, SetTimer, ShowWindow, TranslateMessage, UpdateLayeredWindow,
-    CS_HREDRAW, CS_VREDRAW, IDC_ARROW, MSG, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_TIMER,
-    WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_EX_TRANSPARENT, WS_POPUP,
+use windows::Win32::UI::Shell::{
+    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW,
 };
+use windows::Win32::UI::WindowsAndMessaging::{
+    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW,
+    GetCursorPos, GetMessageW, LoadCursorW, LoadImageW, MessageBoxW, PostMessageW, PostQuitMessage,
+    RegisterClassExW, SetForegroundWindow, SetTimer, ShowWindow, TrackPopupMenu, TranslateMessage,
+    UpdateLayeredWindow, CS_HREDRAW, CS_VREDRAW, IDC_ARROW, IMAGE_ICON, LR_DEFAULTSIZE,
+    LR_LOADFROMFILE, MB_ICONINFORMATION, MB_OK, MF_STRING, MSG, SW_SHOWNOACTIVATE,
+    TPM_RIGHTBUTTON, ULW_ALPHA, WM_APP, WM_COMMAND, WM_DESTROY, WM_LBUTTONUP, WM_NULL,
+    WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+};
+use windows::Win32::UI::WindowsAndMessaging::HICON;
+
+const WM_TRAYICON: u32 = WM_APP + 1;
+const TRAY_ID: u32 = 1;
+const ID_TRAY_ABOUT: usize = 1001;
+const ID_TRAY_QUIT: usize = 1002;
+
+const ABOUT_TEXT: PCWSTR = windows::core::w!(
+    "DeskFrog v1.0\n\nCopyright (c) 2026 Dominic Lenz\n\nOpen Source software licensed under GNU GPL v3\n\nhttps://github.com/Zongonaut/deskfrog/\n\nFont8x8 by Daniel Hepper (Public Domain)"
+);
+const ABOUT_TITLE: PCWSTR = windows::core::w!("About DeskFrog");
+
+fn to_wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Loads the icon shipped in the source tree's `assets/` folder. Baking in the
+/// manifest-relative path (rather than an embedded resource ID) keeps this
+/// simple while the project has no packaging/install step yet — revisit if
+/// DeskFrog ever ships as a relocated standalone binary.
+fn load_frog_icon() -> HICON {
+    let path = to_wide(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/frog.ico"));
+    unsafe {
+        match LoadImageW(None, PCWSTR(path.as_ptr()), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE) {
+            Ok(handle) => HICON(handle.0),
+            Err(_) => HICON::default(),
+        }
+    }
+}
 
 /// Current mouse position in virtual-desktop coordinates, regardless of which
 /// window (if any) has focus — works even though FrogWindow is click-through.
@@ -76,6 +111,7 @@ pub struct FrogWindow {
     bitmap: HBITMAP,
     old_bitmap: HGDIOBJ,
     pixels: *mut u8,
+    tray_icon: Option<HICON>,
 }
 
 impl FrogWindow {
@@ -150,7 +186,32 @@ impl FrogWindow {
                 bitmap,
                 old_bitmap,
                 pixels: bits_ptr as *mut u8,
+                tray_icon: None,
             })
+        }
+    }
+
+    /// Adds a tray icon with a right/left-click context menu (About, Quit).
+    /// Quit closes this window, which ends `run_message_loop_with`.
+    pub fn enable_tray_icon(&mut self, tooltip: &str) {
+        let icon = load_frog_icon();
+        self.tray_icon = Some(icon);
+
+        let mut data = NOTIFYICONDATAW {
+            cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+            hWnd: self.hwnd,
+            uID: TRAY_ID,
+            uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
+            uCallbackMessage: WM_TRAYICON,
+            hIcon: icon,
+            ..Default::default()
+        };
+        let tip = to_wide(tooltip);
+        let len = tip.len().min(data.szTip.len() - 1);
+        data.szTip[..len].copy_from_slice(&tip[..len]);
+
+        unsafe {
+            let _ = Shell_NotifyIconW(NIM_ADD, &data);
         }
     }
 
@@ -231,6 +292,15 @@ impl FrogWindow {
 impl Drop for FrogWindow {
     fn drop(&mut self) {
         unsafe {
+            if self.tray_icon.is_some() {
+                let data = NOTIFYICONDATAW {
+                    cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+                    hWnd: self.hwnd,
+                    uID: TRAY_ID,
+                    ..Default::default()
+                };
+                let _ = Shell_NotifyIconW(NIM_DELETE, &data);
+            }
             SelectObject(self.mem_dc, self.old_bitmap);
             let _ = DeleteObject(self.bitmap.into());
             let _ = DeleteDC(self.mem_dc);
@@ -249,6 +319,45 @@ unsafe extern "system" fn wnd_proc(
             unsafe { PostQuitMessage(0) };
             LRESULT(0)
         }
+        WM_TRAYICON => {
+            let event = lparam.0 as u32;
+            if event == WM_RBUTTONUP || event == WM_LBUTTONUP {
+                unsafe { show_tray_menu(hwnd) };
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            match wparam.0 & 0xFFFF {
+                ID_TRAY_ABOUT => unsafe {
+                    let _ = MessageBoxW(Some(hwnd), ABOUT_TEXT, ABOUT_TITLE, MB_OK | MB_ICONINFORMATION);
+                },
+                ID_TRAY_QUIT => unsafe {
+                    let _ = DestroyWindow(hwnd);
+                },
+                _ => {}
+            }
+            LRESULT(0)
+        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
+
+/// Standard Win32 tray-menu recipe: the owner window must briefly become the
+/// foreground window for the popup to behave correctly (dismiss on outside
+/// click), and a trailing WM_NULL works around a documented Explorer quirk
+/// where the menu can otherwise fail to close.
+unsafe fn show_tray_menu(hwnd: HWND) {
+    unsafe {
+        let Ok(hmenu) = CreatePopupMenu() else { return };
+        let _ = AppendMenuW(hmenu, MF_STRING, ID_TRAY_ABOUT, windows::core::w!("About"));
+        let _ = AppendMenuW(hmenu, MF_STRING, ID_TRAY_QUIT, windows::core::w!("Quit"));
+
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+
+        let _ = SetForegroundWindow(hwnd);
+        let _ = TrackPopupMenu(hmenu, TPM_RIGHTBUTTON, pt.x, pt.y, Some(0), hwnd, None);
+        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(hmenu);
     }
 }

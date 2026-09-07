@@ -39,7 +39,7 @@ fn main() {
     let start = Point { x: 1000, y: 1000 };
 
     let mut rng = StdRng::seed_from_u64(42);
-    let mut frog = Frog::new(start, 24, &mut rng);
+    let mut frog = Frog::new(start, 24, 120, deskfrog::brain::messages::MESSAGES.iter().map(|s| s.to_string()).collect(), &mut rng);
 
     let mut panics = 0;
     let mut trials = 0;
@@ -75,7 +75,7 @@ fn main() {
     // Regression check: panic must never interrupt a sleep or an in-progress
     // commentary bubble — only a plain, silent wander.
     let mut rng2 = StdRng::seed_from_u64(7);
-    let mut frog2 = Frog::new(Point { x: 1000, y: 1000 }, 24, &mut rng2);
+    let mut frog2 = Frog::new(Point { x: 1000, y: 1000 }, 24, 120, deskfrog::brain::messages::MESSAGES.iter().map(|s| s.to_string()).collect(), &mut rng2);
     let mut sleep_interrupts = 0;
     let mut commentary_interrupts = 0;
     let mut sleep_trials = 0;
@@ -117,7 +117,7 @@ fn main() {
     // Idle/sleep timing check: classify each tick as sleep (bubble shows z z z),
     // idle (position didn't move and it's not a sleep tick), or moved.
     let mut rng3 = StdRng::seed_from_u64(99);
-    let mut frog3 = Frog::new(Point { x: 1000, y: 1000 }, 24, &mut rng3);
+    let mut frog3 = Frog::new(Point { x: 1000, y: 1000 }, 24, 120, deskfrog::brain::messages::MESSAGES.iter().map(|s| s.to_string()).collect(), &mut rng3);
     let (mut sleep_ticks, mut idle_ticks, mut moved_ticks) = (0u32, 0u32, 0u32);
     let (mut sleep_runs, mut idle_runs) = (0u32, 0u32);
     let mut prev_sleeping = false;
