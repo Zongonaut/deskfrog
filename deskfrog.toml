@@ -1,0 +1,43 @@
+# DeskFrog configuration.
+#
+# This file is optional — DeskFrog runs fine with sensible defaults if it's
+# missing, or if any value below is left out or fails to parse (a bad config
+# is logged and ignored, never a reason to fail to start).
+#
+# To use it: place a copy of this file named `deskfrog.toml` next to
+# deskfrog.exe.
+#
+# NOTE on ordering: `messages` must stay above the [appearance]/[behavior]
+# section headers below. In TOML, a plain `key = value` line is parsed as
+# belonging to whichever [section] appears above it in the file — so if you
+# move `messages` below a section header, it silently becomes a key of that
+# section instead of the top-level messages list, and DeskFrog falls back to
+# its built-in messages instead of yours.
+
+# What the frog says, picked at random. Keep lines short — long messages wrap
+# but the bubble is meant to look like a small retro terminal, not a manual.
+messages = [
+    "Why is your mouse so fast?",
+    "I have important frog business.",
+    "Ribbit.",
+    "Just vibing here.",
+    "Is that a bug? Tasty.",
+    "Don't mind me.",
+    "Nice desktop.",
+]
+
+[appearance]
+# Size of the frog glyph in pixels. Also sets the grid step size, since the
+# frog moves one glyph-width per step (like a tile in a roguelike).
+frog_size_px = 24.0
+
+# Integer scale for the speech-bubble font (1 = smallest, 2 = double size, ...).
+bubble_scale = 1
+
+[behavior]
+# How often the frog's brain ticks, in milliseconds. This drives movement,
+# idle/sleep timing, and commentary — lower is more responsive but busier.
+step_interval_ms = 500
+
+# How close (in pixels) the mouse cursor has to get before the frog flees.
+flee_radius_px = 120

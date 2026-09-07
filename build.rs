@@ -1,7 +1,10 @@
 fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut res = winres::WindowsResource::new();
-        res.set_icon("assets/frog.ico");
+        // Fixed ID so the tray icon can load this exact embedded resource at
+        // runtime (see platform::windows::load_frog_icon) instead of depending
+        // on a loose .ico file shipped next to the exe.
+        res.set_icon_with_id("assets/frog.ico", "1");
         res.compile().expect("failed to embed exe icon resource");
     }
 }

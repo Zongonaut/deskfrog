@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use deskfrog::brain::movement::{monitor_containing, Point};
 use deskfrog::brain::{Frog, WorldInput};
 use deskfrog::platform::windows::{cursor_pos, enumerate_monitors, FrogWindow};

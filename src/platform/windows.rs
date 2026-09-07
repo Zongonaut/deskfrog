@@ -16,7 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetMessageW, LoadCursorW, LoadImageW, MessageBoxW, PostMessageW, PostQuitMessage,
     RegisterClassExW, SetForegroundWindow, SetTimer, ShowWindow, TrackPopupMenu, TranslateMessage,
     UpdateLayeredWindow, CS_HREDRAW, CS_VREDRAW, IDC_ARROW, IMAGE_ICON, LR_DEFAULTSIZE,
-    LR_LOADFROMFILE, MB_ICONINFORMATION, MB_OK, MF_STRING, MSG, SW_SHOWNOACTIVATE,
+    MB_ICONINFORMATION, MB_OK, MF_STRING, MSG, SW_SHOWNOACTIVATE,
     TPM_RIGHTBUTTON, ULW_ALPHA, WM_APP, WM_COMMAND, WM_DESTROY, WM_LBUTTONUP, WM_NULL,
     WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
@@ -37,14 +37,16 @@ fn to_wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Loads the icon shipped in the source tree's `assets/` folder. Baking in the
-/// manifest-relative path (rather than an embedded resource ID) keeps this
-/// simple while the project has no packaging/install step yet — revisit if
-/// DeskFrog ever ships as a relocated standalone binary.
+/// Loads the same icon resource `build.rs` embeds as the exe's icon (resource
+/// ID 1 — see `set_icon_with_id` there), rather than a loose file on disk.
+/// This is what makes the tray icon work from a standalone release build with
+/// no `assets/` folder shipped alongside it.
 fn load_frog_icon() -> HICON {
-    let path = to_wide(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/frog.ico"));
     unsafe {
-        match LoadImageW(None, PCWSTR(path.as_ptr()), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE) {
+        let Ok(hinstance) = windows::Win32::System::LibraryLoader::GetModuleHandleW(None) else {
+            return HICON::default();
+        };
+        match LoadImageW(Some(hinstance.into()), PCWSTR(1usize as *const u16), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE) {
             Ok(handle) => HICON(handle.0),
             Err(_) => HICON::default(),
         }
