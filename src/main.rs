@@ -1,6 +1,6 @@
 use deskfrog::brain::movement::{monitor_containing, Point};
 use deskfrog::brain::{Frog, WorldInput};
-use deskfrog::platform::windows::{enumerate_monitors, FrogWindow};
+use deskfrog::platform::windows::{cursor_pos, enumerate_monitors, FrogWindow};
 use deskfrog::render::bubble::{self, BubbleStyle};
 use deskfrog::render::font::GLYPH_HEIGHT;
 use deskfrog::render::glyph::GlyphBitmap;
@@ -58,7 +58,7 @@ fn main() {
             canvas_w,
             canvas_h,
             &glyph,
-            frog.bubble(),
+            frog.bubble().as_deref(),
             &style,
             prefer_below(frog.pos, monitors, canvas_h),
         );
@@ -71,7 +71,13 @@ fn main() {
 
     window.start_timer(STEP_INTERVAL_MS);
     window.run_message_loop_with(|| {
-        frog.step(&WorldInput { monitors: &monitors }, &mut rng);
+        frog.step(
+            &WorldInput {
+                monitors: &monitors,
+                cursor: cursor_pos(),
+            },
+            &mut rng,
+        );
         render_frog(&frog, &monitors)
     });
 }

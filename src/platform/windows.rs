@@ -1,4 +1,4 @@
-use crate::brain::movement::MonitorBounds;
+use crate::brain::movement::{MonitorBounds, Point};
 use crate::render::Frame;
 use windows::core::{BOOL, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
@@ -9,11 +9,22 @@ use windows::Win32::Graphics::Gdi::{
     MONITORINFO,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, LoadCursorW, PostQuitMessage,
-    RegisterClassExW, SetTimer, ShowWindow, TranslateMessage, UpdateLayeredWindow, CS_HREDRAW,
-    CS_VREDRAW, IDC_ARROW, MSG, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_TIMER, WNDCLASSEXW,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetCursorPos, GetMessageW, LoadCursorW,
+    PostQuitMessage, RegisterClassExW, SetTimer, ShowWindow, TranslateMessage, UpdateLayeredWindow,
+    CS_HREDRAW, CS_VREDRAW, IDC_ARROW, MSG, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_TIMER,
+    WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_POPUP,
 };
+
+/// Current mouse position in virtual-desktop coordinates, regardless of which
+/// window (if any) has focus — works even though FrogWindow is click-through.
+pub fn cursor_pos() -> Point {
+    let mut p = POINT::default();
+    unsafe {
+        let _ = GetCursorPos(&mut p);
+    }
+    Point { x: p.x, y: p.y }
+}
 
 /// Enumerates all monitors in virtual-desktop coordinates (which may include
 /// negative x/y when a monitor extends left of or above the primary display).

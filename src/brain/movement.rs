@@ -28,6 +28,16 @@ pub fn monitor_containing(p: Point, monitors: &[MonitorBounds]) -> Option<&Monit
     monitors.iter().find(|m| m.contains(p))
 }
 
+fn distance_sq(a: Point, b: Point) -> i64 {
+    let dx = (a.x - b.x) as i64;
+    let dy = (a.y - b.y) as i64;
+    dx * dx + dy * dy
+}
+
+pub fn within(a: Point, b: Point, radius_px: i32) -> bool {
+    distance_sq(a, b) <= (radius_px as i64) * (radius_px as i64)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     N,
@@ -81,6 +91,26 @@ impl Direction {
     }
 }
 
+/// Picks whichever adjacent grid cell ends up farthest from `threat` (the
+/// cursor), staying on some monitor. Used for the frog's flee behavior — this
+/// is a direct maximization rather than momentum-biased, so it always retreats
+/// along the most effective heading available.
+pub fn flee_step(pos: Point, threat: Point, step_px: i32, monitors: &[MonitorBounds]) -> Point {
+    Direction::ALL
+        .into_iter()
+        .filter_map(|dir| {
+            let (dx, dy) = dir.delta();
+            let candidate = Point {
+                x: pos.x + dx * step_px,
+                y: pos.y + dy * step_px,
+            };
+            on_any_monitor(candidate, monitors).then(|| (candidate, distance_sq(candidate, threat)))
+        })
+        .max_by_key(|(_, score)| *score)
+        .map(|(p, _)| p)
+        .unwrap_or(pos)
+}
+
 /// Grid-based wandering with momentum: the frog is biased to keep heading the way
 /// it was already going, occasionally drifts to an adjacent heading, and rarely
 /// picks a fresh direction outright — this reads as purposeful roguelike movement
@@ -96,6 +126,10 @@ impl Wanderer {
             step_px,
             dir: initial_dir,
         }
+    }
+
+    pub fn step_px(&self) -> i32 {
+        self.step_px
     }
 
     /// Picks the next grid cell. Falls back through progressively wider heading
