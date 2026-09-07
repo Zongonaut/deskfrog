@@ -17,7 +17,7 @@ pub struct BubbleStyle {
 impl Default for BubbleStyle {
     fn default() -> Self {
         Self {
-            scale: 2,
+            scale: 1,
             padding: 4,
             fg: (230, 230, 230, 255),
             bg: (10, 10, 10, 235),
