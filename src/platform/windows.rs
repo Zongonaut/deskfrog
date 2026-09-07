@@ -1,17 +1,57 @@
+use crate::brain::movement::MonitorBounds;
 use crate::render::Frame;
-use windows::core::PCWSTR;
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+use windows::core::{BOOL, PCWSTR};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
-    AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION,
-    DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
+    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC,
+    GetMonitorInfoW, ReleaseDC, SelectObject, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR,
+    MONITORINFO,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, LoadCursorW, PostQuitMessage,
-    RegisterClassExW, ShowWindow, TranslateMessage, UpdateLayeredWindow, CS_HREDRAW, CS_VREDRAW,
-    IDC_ARROW, MSG, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WNDCLASSEXW, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    RegisterClassExW, SetTimer, ShowWindow, TranslateMessage, UpdateLayeredWindow, CS_HREDRAW,
+    CS_VREDRAW, IDC_ARROW, MSG, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_TIMER, WNDCLASSEXW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
+
+/// Enumerates all monitors in virtual-desktop coordinates (which may include
+/// negative x/y when a monitor extends left of or above the primary display).
+pub fn enumerate_monitors() -> Vec<MonitorBounds> {
+    let mut monitors: Vec<MonitorBounds> = Vec::new();
+    unsafe {
+        let _ = EnumDisplayMonitors(
+            None,
+            None,
+            Some(monitor_enum_proc),
+            LPARAM(&mut monitors as *mut Vec<MonitorBounds> as isize),
+        );
+    }
+    monitors
+}
+
+unsafe extern "system" fn monitor_enum_proc(
+    hmonitor: HMONITOR,
+    _hdc: HDC,
+    _rect: *mut RECT,
+    lparam: LPARAM,
+) -> BOOL {
+    let monitors = unsafe { &mut *(lparam.0 as *mut Vec<MonitorBounds>) };
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if unsafe { GetMonitorInfoW(hmonitor, &mut info) }.as_bool() {
+        let rc = info.rcWork;
+        monitors.push(MonitorBounds {
+            x: rc.left,
+            y: rc.top,
+            width: rc.right - rc.left,
+            height: rc.bottom - rc.top,
+        });
+    }
+    BOOL(1)
+}
 
 const CLASS_NAME: PCWSTR = windows::core::w!("DeskFrogWindowClass");
 
@@ -153,11 +193,23 @@ impl FrogWindow {
         }
     }
 
-    /// Runs the Win32 message loop until WM_QUIT. Blocks the calling thread.
-    pub fn run_message_loop(&self) {
+    /// Starts a repeating timer that posts WM_TIMER messages into this window's queue.
+    pub fn start_timer(&self, interval_ms: u32) {
+        unsafe {
+            let _ = SetTimer(Some(self.hwnd), 1, interval_ms, None);
+        }
+    }
+
+    /// Runs the Win32 message loop until WM_QUIT, invoking `on_tick` on every WM_TIMER
+    /// and presenting the frame + position it returns. Blocks the calling thread.
+    pub fn run_message_loop_with(&self, mut on_tick: impl FnMut() -> (Frame, i32, i32)) {
         unsafe {
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                if msg.message == WM_TIMER {
+                    let (frame, x, y) = on_tick();
+                    self.present(&frame, x, y);
+                }
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
