@@ -24,6 +24,10 @@ pub fn on_any_monitor(p: Point, monitors: &[MonitorBounds]) -> bool {
     monitors.iter().any(|m| m.contains(p))
 }
 
+pub fn monitor_containing(p: Point, monitors: &[MonitorBounds]) -> Option<&MonitorBounds> {
+    monitors.iter().find(|m| m.contains(p))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     N,
