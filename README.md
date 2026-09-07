@@ -1,11 +1,11 @@
 # DeskFrog 🐸
 
-A tiny desktop companion that wanders around your screen: a 🐸 that takes roguelike-style grid steps, naps, gets startled, and flees when your cursor gets too close, commenting in a small DOS-style speech bubble along the way. No image or sound assets: the frog is your system's own emoji font, and the speech bubble uses an embedded 8x8 bitmap font.
+A tiny desktop companion in the tradition of Oneko that wanders around your screen: a 🐸 that takes roguelike-style grid steps, naps, gets startled, and flees when your cursor gets too close, commenting in a small DOS-style speech bubble along the way. No image or sound assets: the frog is your system's own emoji font, and the speech bubble uses an embedded 8x8 bitmap font.
 
 Windows only for now.
 
 ## Tech stack
-
+- Minimalistic by design.
 - **Rust**, talking to the Win32 API directly via the [`windows`](https://crates.io/crates/windows) crate; 
   no windowing framework.
 - Rendering is CPU-composited and pushed to screen with `UpdateLayeredWindow`, which is
@@ -77,3 +77,5 @@ Open source software licensed under the **GNU General Public License v3.0**. See
 Speech-bubble font: **Font8x8** by Daniel Hepper ([Public Domain](https://github.com/dhepper/font8x8)).
 
 Project home: <https://github.com/Zongonaut/deskfrog/>
+
+> This software was created with AI support.
