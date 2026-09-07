@@ -10,7 +10,7 @@ use render::Frame;
 
 const FROG_SIZE_PX: f32 = 24.0;
 const WINDOW_SIZE: u32 = 60;
-const STEP_PX: i32 = 40;
+const STEP_PX: i32 = FROG_SIZE_PX as i32;
 const STEP_INTERVAL_MS: u32 = 500;
 
 fn draw_frame(glyph: &GlyphBitmap) -> Frame {
