@@ -89,16 +89,80 @@ impl Direction {
     fn random(rng: &mut impl Rng) -> Direction {
         Self::ALL[rng.random_range(0..Self::ALL.len())]
     }
+
+    /// True for NE/SE/SW/NW — the 4 directions interleaved between the cardinals
+    /// in `ALL`, so this is just an index parity check.
+    fn is_diagonal(self) -> bool {
+        self.index() % 2 == 1
+    }
 }
+
+const CARDINAL: [Direction; 4] = [Direction::N, Direction::E, Direction::S, Direction::W];
 
 /// Picks whichever adjacent grid cell ends up farthest from `threat` (the
 /// cursor), staying on some monitor. Used for the frog's flee behavior — this
 /// is a direct maximization rather than momentum-biased, so it always retreats
 /// along the most effective heading available.
 pub fn flee_step(pos: Point, threat: Point, step_px: i32, monitors: &[MonitorBounds]) -> Point {
-    Direction::ALL
-        .into_iter()
-        .filter_map(|dir| {
+    flee_step_within(pos, threat, step_px, monitors, &Direction::ALL)
+}
+
+/// Commits to a single cardinal heading (whichever best increases distance from
+/// `threat` from the *starting* position) and advances `steps` grid cells along
+/// it. Used for the panicked "Eeek!" dash: since a panic tick moves more than
+/// one cell but the caller renders only once per tick, picking a fresh axis per
+/// cell (as `flee_step` does) could land the net per-frame jump on a diagonal.
+/// Committing up front keeps the whole dash — and its visible jump — purely
+/// horizontal or vertical. Stops early (without switching axis) if the chosen
+/// heading would run off every monitor partway through.
+pub fn flee_step_axis_aligned_multi(
+    pos: Point,
+    threat: Point,
+    step_px: i32,
+    steps: u32,
+    monitors: &[MonitorBounds],
+) -> Point {
+    let Some(dir) = CARDINAL
+        .iter()
+        .filter_map(|&dir| {
+            let (dx, dy) = dir.delta();
+            let candidate = Point {
+                x: pos.x + dx * step_px,
+                y: pos.y + dy * step_px,
+            };
+            on_any_monitor(candidate, monitors).then(|| (dir, distance_sq(candidate, threat)))
+        })
+        .max_by_key(|(_, score)| *score)
+        .map(|(dir, _)| dir)
+    else {
+        return pos;
+    };
+
+    let (dx, dy) = dir.delta();
+    let mut current = pos;
+    for _ in 0..steps {
+        let candidate = Point {
+            x: current.x + dx * step_px,
+            y: current.y + dy * step_px,
+        };
+        if !on_any_monitor(candidate, monitors) {
+            break;
+        }
+        current = candidate;
+    }
+    current
+}
+
+fn flee_step_within(
+    pos: Point,
+    threat: Point,
+    step_px: i32,
+    monitors: &[MonitorBounds],
+    directions: &[Direction],
+) -> Point {
+    directions
+        .iter()
+        .filter_map(|&dir| {
             let (dx, dy) = dir.delta();
             let candidate = Point {
                 x: pos.x + dx * step_px,
@@ -138,9 +202,15 @@ impl Wanderer {
     /// every direction is blocked.
     pub fn next_step(&mut self, pos: Point, monitors: &[MonitorBounds], rng: &mut impl Rng) -> Point {
         let roll: f32 = rng.random();
-        let candidate_dir = if roll < 0.6 {
+        // A ±1 turn always flips cardinal<->diagonal, so a symmetric momentum
+        // model spends equal time on each — but a diagonal step covers ~1.4x
+        // the screen distance of a cardinal one, so it visually dominates even
+        // at a 50/50 split. Making diagonal headings less "sticky" (readier to
+        // turn back to cardinal) pulls the felt balance toward cardinal.
+        let (stay, turn) = if self.dir.is_diagonal() { (0.40, 0.45) } else { (0.70, 0.20) };
+        let candidate_dir = if roll < stay {
             self.dir
-        } else if roll < 0.85 {
+        } else if roll < stay + turn {
             self.dir.rotated(if rng.random_bool(0.5) { 1 } else { -1 })
         } else {
             Direction::random(rng)

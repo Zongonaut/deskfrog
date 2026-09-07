@@ -42,5 +42,8 @@ fn main() {
     let diag = compose(w, h, &glyph, Some("AaBbCc123 Fp"), &style, false);
     save_frame(&diag.frame, "bubble_diag.png");
 
-    println!("wrote bubble_above.png, bubble_below.png, bubble_none.png, bubble_diag.png");
+    let panic = compose(w, h, &glyph, Some("Eeek! Go away!"), &style, false);
+    save_frame(&panic.frame, "bubble_panic.png");
+
+    println!("wrote bubble_above.png, bubble_below.png, bubble_none.png, bubble_diag.png, bubble_panic.png");
 }
