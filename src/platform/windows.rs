@@ -53,6 +53,11 @@ fn load_frog_icon() -> HICON {
     }
 }
 
+/// Path to a color emoji font. Windows ships Segoe UI Emoji at a fixed location.
+pub fn emoji_font_path() -> std::path::PathBuf {
+    std::path::PathBuf::from(r"C:\Windows\Fonts\seguiemj.ttf")
+}
+
 /// Current mouse position in virtual-desktop coordinates, regardless of which
 /// window (if any) has focus — works even though FrogWindow is click-through.
 pub fn cursor_pos() -> Point {

@@ -1,8 +1,8 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 use deskfrog::brain::movement::{monitor_containing, Point};
 use deskfrog::brain::{Frog, WorldInput};
-use deskfrog::platform::windows::{cursor_pos, enumerate_monitors, FrogWindow};
+use deskfrog::platform::{cursor_pos, emoji_font_path, enumerate_monitors, FrogWindow};
 use deskfrog::render::bubble::{self, BubbleStyle};
 use deskfrog::render::font::GLYPH_HEIGHT;
 use deskfrog::render::glyph::GlyphBitmap;
@@ -29,9 +29,9 @@ fn main() {
     let frog_size_px = config.appearance.frog_size_px;
     let step_px = frog_size_px as i32;
 
-    let font_data = std::fs::read(r"C:\Windows\Fonts\seguiemj.ttf").expect("failed to read emoji font");
+    let font_data = std::fs::read(emoji_font_path()).expect("failed to read emoji font");
     let glyph: GlyphBitmap = render::glyph::rasterize_color_emoji(&font_data, '\u{1F438}', frog_size_px)
-        .expect("failed to rasterize frog emoji");
+        .expect("failed to rasterize frog emoji — is a COLOR emoji font (e.g. Noto Color Emoji) installed?");
 
     let monitors = enumerate_monitors();
     let primary = monitors.first().expect("no monitors detected");

@@ -1,5 +1,6 @@
 fn main() {
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+    #[cfg(windows)]
+    {
         let mut res = winres::WindowsResource::new();
         // Fixed ID so the tray icon can load this exact embedded resource at
         // runtime (see platform::windows::load_frog_icon) instead of depending
