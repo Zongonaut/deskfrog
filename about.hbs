@@ -1,0 +1,28 @@
+THIRD-PARTY LICENSES
+=====================
+
+DeskFrog itself is licensed under the GNU General Public License v3.0 (see
+LICENSE). It's built on the Rust crates listed below, each under its own
+permissive license -- see the overview below for exactly which. This file
+reproduces those licenses' required notices, grouped by license text so
+each one appears only once.
+
+Overview
+--------
+{{#each overview}}
+- {{{name}}} ({{{count}}} package(s))
+{{/each}}
+
+{{#each licenses}}
+=====================================================================
+{{{name}}}
+=====================================================================
+
+Used by:
+{{#each used_by}}
+  - {{{crate.name}}} {{{crate.version}}}{{#if crate.repository}} ({{{crate.repository}}}){{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}
